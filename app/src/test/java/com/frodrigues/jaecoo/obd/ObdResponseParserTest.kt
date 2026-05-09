@@ -56,4 +56,19 @@ class ObdResponseParserTest {
         assertNotNull(bytes)
         assertEquals(0x3C, bytes!![0].toInt() and 0xFF)
     }
+
+    @Test
+    fun `returns null for whitespace-only response`() {
+        assertNull(ObdResponseParser.extractDataBytes("   \r\n  ", 0x0C))
+    }
+
+    @Test
+    fun `returns null for UNABLE TO CONNECT response`() {
+        assertNull(ObdResponseParser.extractDataBytes("UNABLE TO CONNECT", 0x0C))
+    }
+
+    @Test
+    fun `returns null for question mark response`() {
+        assertNull(ObdResponseParser.extractDataBytes("?", 0x0C))
+    }
 }
