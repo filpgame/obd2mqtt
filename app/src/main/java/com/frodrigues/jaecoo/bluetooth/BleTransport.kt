@@ -91,6 +91,7 @@ class BleTransport(
     }
 
     override suspend fun connect() {
+        responseBuffer.clear()
         connectLatch = CompletableDeferred()
         gatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         withTimeout(10_000) { connectLatch.await() }
@@ -107,7 +108,8 @@ class BleTransport(
         val g = gatt ?: throw IOException("Not connected")
         val service = g.getService(serviceUUID) ?: throw IOException("Service not found")
         val writeChar = service.getCharacteristic(writeUUID) ?: throw IOException("Write char not found")
-        g.writeCharacteristic(writeChar, "$command\r".toByteArray(Charsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        val result = g.writeCharacteristic(writeChar, "$command\r".toByteArray(Charsets.UTF_8), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
+        if (result != BluetoothGatt.GATT_SUCCESS) throw IOException("BLE write failed: $result")
         return withTimeout(5_000) { responseChannel.receive() }
     }
 }

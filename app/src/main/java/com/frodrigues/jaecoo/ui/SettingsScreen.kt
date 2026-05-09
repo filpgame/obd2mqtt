@@ -1,7 +1,7 @@
 package com.frodrigues.jaecoo.ui
 
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +36,7 @@ fun SettingsScreen(
     val deviceModel by settings.deviceModel.collectAsState(initial = "Jaecoo 7")
     val deviceManufacturer by settings.deviceManufacturer.collectAsState(initial = "Jaecoo")
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
 
@@ -43,8 +44,8 @@ fun SettingsScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 pairedDevices = try {
-                    @Suppress("DEPRECATION")
-                    BluetoothAdapter.getDefaultAdapter()?.bondedDevices?.toList() ?: emptyList()
+                    context.getSystemService(BluetoothManager::class.java)
+                        ?.adapter?.bondedDevices?.toList() ?: emptyList()
                 } catch (_: SecurityException) {
                     emptyList()
                 }

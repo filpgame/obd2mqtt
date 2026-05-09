@@ -2,12 +2,17 @@ package com.frodrigues.jaecoo.obd
 
 import com.frodrigues.jaecoo.bluetooth.BluetoothTransport
 import kotlinx.coroutines.delay
+import java.io.IOException
 
 class ObdCommandExecutor(private val transport: BluetoothTransport) {
 
     suspend fun initialize() {
-        transport.sendCommand("ATZ")
+        val atzResponse = transport.sendCommand("ATZ")
         delay(1000)
+        if (!atzResponse.contains("ELM", ignoreCase = true) &&
+            !atzResponse.contains("OK", ignoreCase = true)) {
+            throw IOException("ELM327 not detected. Got: $atzResponse")
+        }
         transport.sendCommand("ATE0")
         transport.sendCommand("ATL0")
         transport.sendCommand("ATH1")

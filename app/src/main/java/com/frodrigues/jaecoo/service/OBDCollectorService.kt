@@ -3,7 +3,7 @@ package com.frodrigues.jaecoo.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
@@ -40,6 +40,9 @@ class OBDCollectorService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        status.value = ServiceStatus.IDLE
+        activePidCount.value = 0
+        lastUpdateTime.value = 0L
         settings = AppSettings(applicationContext.dataStore)
         createNotificationChannel()
     }
@@ -95,8 +98,7 @@ class OBDCollectorService : LifecycleService() {
         status.value = ServiceStatus.CONNECTING
         updateNotification("Connecting to Bluetooth...")
 
-        @Suppress("DEPRECATION")
-        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        val bluetoothAdapter = getSystemService(BluetoothManager::class.java)?.adapter
             ?: throw IllegalStateException("Bluetooth not available")
 
         val device = bluetoothAdapter.getRemoteDevice(config.btDeviceMac)
