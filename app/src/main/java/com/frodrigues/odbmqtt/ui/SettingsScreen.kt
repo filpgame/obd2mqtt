@@ -6,11 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -40,7 +39,7 @@ fun SettingsScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
 
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 pairedDevices = try {
@@ -60,38 +59,65 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("← Back") }
-                }
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors()
             )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Bluetooth Device", style = MaterialTheme.typography.titleSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Bluetooth Device ──────────────────────────────────────────────
+            SectionHeader(text = "Bluetooth Device")
+
             if (pairedDevices.isEmpty()) {
-                Text("No paired devices found. Pair your ELM327 in Android Settings first.")
+                Text(
+                    text = "No paired devices found. Pair your ELM327 adapter in Android Settings first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+
             pairedDevices.forEach { device ->
                 val name = runCatching { device.name }.getOrDefault(device.address)
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            settings.update { this[AppSettings.BT_DEVICE_MAC] = device.address }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (device.address == btMac) "✓ $name" else name)
+                val selected = device.address == btMac
+
+                if (selected) {
+                    FilledTonalButton(
+                        onClick = {},
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("✓  $name")
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                settings.update { this[AppSettings.BT_DEVICE_MAC] = device.address }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(name)
+                    }
                 }
             }
 
-            HorizontalDivider()
-            Text("MQTT", style = MaterialTheme.typography.titleSmall)
+            // ── MQTT Broker ───────────────────────────────────────────────────
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SectionHeader(text = "MQTT Broker")
 
             OutlinedTextField(
                 value = mqttHost,
@@ -99,6 +125,7 @@ fun SettingsScreen(
                     scope.launch { settings.update { this[AppSettings.MQTT_HOST] = v } }
                 },
                 label = { Text("Host") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -109,6 +136,7 @@ fun SettingsScreen(
                     }
                 },
                 label = { Text("Port") },
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -117,7 +145,8 @@ fun SettingsScreen(
                 onValueChange = { v ->
                     scope.launch { settings.update { this[AppSettings.MQTT_USER] = v } }
                 },
-                label = { Text("Username (optional)") },
+                label = { Text("Username") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -125,13 +154,32 @@ fun SettingsScreen(
                 onValueChange = { v ->
                     scope.launch { settings.update { this[AppSettings.MQTT_PASSWORD] = v } }
                 },
-                label = { Text("Password (optional)") },
+                label = { Text("Password") },
+                singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            HorizontalDivider()
-            Text("Poll Interval: ${pollInterval}s", style = MaterialTheme.typography.titleSmall)
+            // ── Polling ───────────────────────────────────────────────────────
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SectionHeader(text = "Polling")
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Interval",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${pollInterval}s",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             Slider(
                 value = pollInterval.toFloat(),
                 onValueChange = { v ->
@@ -144,15 +192,17 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            HorizontalDivider()
-            Text("Device Info", style = MaterialTheme.typography.titleSmall)
+            // ── Device Info (HA) ──────────────────────────────────────────────
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SectionHeader(text = "Device Info (Home Assistant)")
 
             OutlinedTextField(
                 value = deviceName,
                 onValueChange = { v ->
                     scope.launch { settings.update { this[AppSettings.DEVICE_NAME] = v } }
                 },
-                label = { Text("Device Name") },
+                label = { Text("Name") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -161,6 +211,7 @@ fun SettingsScreen(
                     scope.launch { settings.update { this[AppSettings.DEVICE_MODEL] = v } }
                 },
                 label = { Text("Model") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
@@ -169,8 +220,20 @@ fun SettingsScreen(
                     scope.launch { settings.update { this[AppSettings.DEVICE_MANUFACTURER] = v } }
                 },
                 label = { Text("Manufacturer") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary
+    )
 }

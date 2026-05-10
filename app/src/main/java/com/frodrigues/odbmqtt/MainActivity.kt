@@ -14,7 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.frodrigues.odbmqtt.ui.MainScreen
 import com.frodrigues.odbmqtt.ui.MainViewModel
 import com.frodrigues.odbmqtt.ui.SettingsScreen
-import com.frodrigues.odbmqtt.ui.theme.JaecooTheme
+import com.frodrigues.odbmqtt.ui.theme.OdbMqttTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            JaecooTheme {
+            OdbMqttTheme {
                 AppNavigation()
             }
         }
