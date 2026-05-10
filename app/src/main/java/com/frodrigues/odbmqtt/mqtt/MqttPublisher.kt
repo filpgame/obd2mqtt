@@ -58,3 +58,25 @@ class MqttPublisher(private val config: AppConfig) {
         client = null
     }
 }
+
+suspend fun testMqttConnection(config: AppConfig): Result<Unit> = runCatching {
+    withContext(Dispatchers.IO) {
+        val testClient = MqttClient.builder()
+            .useMqttVersion3()
+            .identifier("obd2_test_${System.currentTimeMillis()}")
+            .serverHost(config.mqttHost)
+            .serverPort(config.mqttPort)
+            .buildAsync()
+
+        val connectBuilder = testClient.connectWith()
+        if (config.mqttUser.isNotBlank()) {
+            connectBuilder
+                .simpleAuth()
+                .username(config.mqttUser)
+                .password(config.mqttPassword.toByteArray(Charsets.UTF_8))
+                .applySimpleAuth()
+        }
+        connectBuilder.send().get(5, java.util.concurrent.TimeUnit.SECONDS)
+        runCatching { testClient.disconnect().get(2, java.util.concurrent.TimeUnit.SECONDS) }
+    }
+}
