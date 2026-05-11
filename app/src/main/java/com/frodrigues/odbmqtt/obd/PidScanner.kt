@@ -1,35 +1,38 @@
 package com.frodrigues.odbmqtt.obd
 
+import android.util.Log
+
 class PidScanner(private val executor: ObdCommandExecutor) {
 
-    private val supportPids = listOf(0x00, 0x20, 0x40, 0x60, 0x80, 0xA0, 0xC0)
-
+    /**
+     * Probes each PID in PidRegistry directly instead of relying on OBD2 support bitmasks.
+     *
+     * Bitmask scanning (0100, 0120, ...) is unreliable on many vehicles — they declare PIDs
+     * as supported in the bitmask but return NO DATA when polled. Direct probing ensures
+     * supportedPids only contains PIDs that actually respond with valid data.
+     */
     suspend fun scan(): Set<Int> {
         val supported = mutableSetOf<Int>()
+        Log.d(TAG, "Probing ${PidRegistry.definitions.size} known PIDs...")
 
-        for (supportPid in supportPids) {
-            val cmd = "01${supportPid.toString(16).padStart(2, '0').uppercase()}"
-            val response = executor.sendCommand(cmd)
-            val bytes = ObdResponseParser.extractDataBytes(response, supportPid)
-            if (bytes == null || bytes.size < 4) break
+        for ((pid, def) in PidRegistry.definitions) {
+            val pidHex = pid.toString(16).padStart(2, '0').uppercase()
+            val response = executor.sendCommand("01$pidHex")
+            val value = PidParser.parse(pid, response)
 
-            val bitmask = (bytes.u(0) shl 24) or
-                          (bytes.u(1) shl 16) or
-                          (bytes.u(2) shl 8) or
-                          bytes.u(3)
-
-            for (bit in 0..31) {
-                if (bitmask and (1 shl (31 - bit)) != 0) {
-                    val pid = supportPid + bit + 1
-                    if (pid % 0x20 != 0) {
-                        supported.add(pid)
-                    }
-                }
+            if (value != null) {
+                supported.add(pid)
+                Log.d(TAG, "✓ 0x$pidHex ${def.name}: $value ${def.unit}")
+            } else {
+                Log.v(TAG, "✗ 0x$pidHex ${def.name}: no data (response: ${response.take(40)})")
             }
-
-            if ((bitmask and 1) == 0) break
         }
 
+        Log.d(TAG, "Scan complete — ${supported.size}/${PidRegistry.definitions.size} PIDs responding")
         return supported
+    }
+
+    companion object {
+        private const val TAG = "PidScanner"
     }
 }
