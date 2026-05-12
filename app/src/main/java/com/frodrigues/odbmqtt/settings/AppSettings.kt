@@ -36,8 +36,10 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
         val DEVICE_NAME = stringPreferencesKey("deviceName")
         val DEVICE_MODEL = stringPreferencesKey("deviceModel")
         val DEVICE_MANUFACTURER = stringPreferencesKey("deviceManufacturer")
-        // PID discovery cache
+        // Mode 01 PID discovery cache
         val CACHED_PIDS = stringPreferencesKey("cachedPids")
+        // Mode 22 PID discovery cache — key:hex PID (4 chars), value:hex bytes
+        val CACHED_MODE22_PIDS = stringPreferencesKey("cachedMode22Pids")
     }
 
     val btDeviceMac: Flow<String> = dataStore.data.map { it[BT_DEVICE_MAC] ?: "" }
@@ -74,6 +76,32 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
 
     suspend fun clearPidCache() {
         update { remove(CACHED_PIDS) }
+    }
+
+    // ── Mode 22 cache ────────────────────────────────────────────────────────
+    // Format: "XXYY:AABBCC,XXYY:AABB,..." — pid hex : data bytes hex
+    val cachedMode22Pids: kotlinx.coroutines.flow.Flow<Map<Int, ByteArray>> = dataStore.data.map { prefs ->
+        val raw = prefs[CACHED_MODE22_PIDS] ?: ""
+        if (raw.isBlank()) emptyMap()
+        else raw.split(",").mapNotNull { entry ->
+            val parts = entry.split(":")
+            if (parts.size != 2) return@mapNotNull null
+            val pid = parts[0].toIntOrNull(16) ?: return@mapNotNull null
+            val bytes = parts[1].chunked(2).mapNotNull { it.toIntOrNull(16)?.toByte() }.toByteArray()
+            pid to bytes
+        }.toMap()
+    }
+
+    suspend fun saveMode22Cache(pids: Map<Int, ByteArray>) {
+        update {
+            this[CACHED_MODE22_PIDS] = pids.entries.joinToString(",") { (pid, bytes) ->
+                "${pid.toString(16).padStart(4,'0').uppercase()}:${bytes.joinToString("") { "%02X".format(it) }}"
+            }
+        }
+    }
+
+    suspend fun clearMode22Cache() {
+        update { remove(CACHED_MODE22_PIDS) }
     }
 
     suspend fun update(block: MutablePreferences.() -> Unit) {

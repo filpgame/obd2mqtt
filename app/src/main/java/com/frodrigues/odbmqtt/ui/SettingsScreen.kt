@@ -462,7 +462,13 @@ fun SettingsScreen(
                         onClick = { scope.launch { settings.clearPidCache() } },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Clear PID Cache (Rescan on next start)")
+                        Text("Clear Mode 01 Cache")
+                    }
+                    OutlinedButton(
+                        onClick = { scope.launch { settings.clearMode22Cache() } },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Clear Mode 22 Cache")
                     }
                 }
             }

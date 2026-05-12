@@ -15,6 +15,8 @@ import com.frodrigues.odbmqtt.MainActivity
 import com.frodrigues.odbmqtt.bluetooth.BluetoothTransportFactory
 import com.frodrigues.odbmqtt.mqtt.HaDiscoveryPublisher
 import com.frodrigues.odbmqtt.mqtt.MqttPublisher
+import com.frodrigues.odbmqtt.obd.Mode22Registry
+import com.frodrigues.odbmqtt.obd.Mode22Scanner
 import com.frodrigues.odbmqtt.obd.ObdCommandExecutor
 import com.frodrigues.odbmqtt.obd.PidPoller
 import com.frodrigues.odbmqtt.obd.PidScanner
@@ -145,19 +147,77 @@ class OBDCollectorService : LifecycleService() {
                 config = config
             ).publishDiscovery(supportedPids, mac)
 
-            status.value = ServiceStatus.CONNECTED
-            updateNotification("Connected — ${supportedPids.size} PIDs")
+            // ── Mode 22 scan ─────────────────────────────────────────────────────
+            updateNotification("Scanning Mode 22 PIDs...")
+        val mode22Pids = Mode22Scanner(
+            executor = executor,
+            settings = settings,
+            onProgress = { scanned, total ->
+                updateNotification("Scanning Mode 22 ($scanned/$total)...")
+            }
+        ).scan()
 
-            val currentReadings = mutableMapOf<Int, Double>()
+        // Publish Mode 22 HA Discovery
+        mode22Pids.keys.forEach { pid ->
+            val def = Mode22Registry.getOrUnknown(pid)
+            val pidHex = pid.toString(16).padStart(4, '0').uppercase()
+            val topic = "homeassistant/sensor/obd2_${mac}/m22_$pidHex/config"
+            val stateTopic = "obd2/$mac/m22_$pidHex/state"
+            val payload = buildString {
+                append("{")
+                append("\"name\":\"${config.deviceName} ${def.name}\"")
+                append(",\"state_topic\":\"$stateTopic\"")
+                if (def.unit.isNotBlank()) append(",\"unit_of_measurement\":\"${def.unit}\"")
+                append(",\"unique_id\":\"${mac}_m22_$pidHex\"")
+                def.haDeviceClass?.let { append(",\"device_class\":\"$it\"") }
+                append(",\"device\":{\"identifiers\":[\"obd2_$mac\"],\"name\":\"${config.deviceName}\"}")
+                append("}")
+            }
+            mqttPublisher.publish(topic, payload, retain = true)
+        }
 
-            PidPoller(executor, supportedPids, config.pollIntervalSeconds).readings().collect { reading ->
-                currentReadings[reading.pid] = reading.value
-                pidReadings.value = currentReadings.toMap()
+        status.value = ServiceStatus.CONNECTED
+        updateNotification("Connected — ${supportedPids.size} M01 + ${mode22Pids.size} M22 PIDs")
 
-                val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()
-                val value = reading.value.toBigDecimal().stripTrailingZeros().toPlainString()
-                mqttPublisher.publish("obd2/$mac/$pidHex/state", value, retain = true)
-                lastUpdateTime.value = reading.timestamp
+        val currentReadings = mutableMapOf<Int, Double>()
+
+            coroutineScope {
+                // Mode 01 polling loop
+                launch {
+                    PidPoller(executor, supportedPids, config.pollIntervalSeconds).readings().collect { reading ->
+                        currentReadings[reading.pid] = reading.value
+                        pidReadings.value = currentReadings.toMap()
+                        val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()
+                        val value = reading.value.toBigDecimal().stripTrailingZeros().toPlainString()
+                        mqttPublisher.publish("obd2/$mac/$pidHex/state", value, retain = true)
+                        lastUpdateTime.value = reading.timestamp
+                    }
+                }
+                // Mode 22 polling loop (parallel, same interval)
+                if (mode22Pids.isNotEmpty()) {
+                    launch {
+                        while (true) {
+                            mode22Pids.keys.forEach { m22Pid ->
+                                val high = (m22Pid shr 8) and 0xFF
+                                val low = m22Pid and 0xFF
+                                val cmd = "22${high.toString(16).padStart(2,'0').uppercase()}${low.toString(16).padStart(2,'0').uppercase()}"
+                                val resp = executor.sendCommand(cmd)
+                                val bytes = Mode22Scanner.extractMode22Bytes(resp, m22Pid)
+                                if (bytes != null) {
+                                    val def = Mode22Registry.getOrUnknown(m22Pid)
+                                    val m22Value = runCatching { def.formula(bytes) }.getOrNull() ?: return@forEach
+                                    val m22Hex = m22Pid.toString(16).padStart(4, '0').uppercase()
+                                    mqttPublisher.publish(
+                                        "obd2/$mac/m22_$m22Hex/state",
+                                        m22Value.toBigDecimal().stripTrailingZeros().toPlainString(),
+                                        retain = true
+                                    )
+                                }
+                            }
+                            delay(config.pollIntervalSeconds * 1000L)
+                        }
+                    }
+                }
             }
         } finally {
             publishUnavailable()
