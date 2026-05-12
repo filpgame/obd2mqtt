@@ -181,44 +181,14 @@ class OBDCollectorService : LifecycleService() {
 
         val currentReadings = mutableMapOf<Int, Double>()
 
-            coroutineScope {
-                // Mode 01 polling loop
-                launch {
-                    PidPoller(executor, supportedPids, config.pollIntervalSeconds).readings().collect { reading ->
-                        currentReadings[reading.pid] = reading.value
-                        pidReadings.value = currentReadings.toMap()
-                        val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()
-                        val value = reading.value.toBigDecimal().stripTrailingZeros().toPlainString()
-                        mqttPublisher.publish("obd2/$mac/$pidHex/state", value, retain = true)
-                        lastUpdateTime.value = reading.timestamp
-                    }
-                }
-                // Mode 22 polling loop (parallel, same interval)
-                if (mode22Pids.isNotEmpty()) {
-                    launch {
-                        while (true) {
-                            mode22Pids.keys.forEach { m22Pid ->
-                                val high = (m22Pid shr 8) and 0xFF
-                                val low = m22Pid and 0xFF
-                                val cmd = "22${high.toString(16).padStart(2,'0').uppercase()}${low.toString(16).padStart(2,'0').uppercase()}"
-                                val resp = executor.sendCommand(cmd)
-                                val bytes = Mode22Scanner.extractMode22Bytes(resp, m22Pid)
-                                if (bytes != null) {
-                                    val def = Mode22Registry.getOrUnknown(m22Pid)
-                                    val m22Value = runCatching { def.formula(bytes) }.getOrNull() ?: return@forEach
-                                    val m22Hex = m22Pid.toString(16).padStart(4, '0').uppercase()
-                                    mqttPublisher.publish(
-                                        "obd2/$mac/m22_$m22Hex/state",
-                                        m22Value.toBigDecimal().stripTrailingZeros().toPlainString(),
-                                        retain = true
-                                    )
-                                }
-                            }
-                            delay(config.pollIntervalSeconds * 1000L)
-                        }
-                    }
-                }
-            }
+        PidPoller(executor, supportedPids, config.pollIntervalSeconds).readings().collect { reading ->
+            currentReadings[reading.pid] = reading.value
+            pidReadings.value = currentReadings.toMap()
+            val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()
+            val value = reading.value.toBigDecimal().stripTrailingZeros().toPlainString()
+            mqttPublisher.publish("obd2/$mac/$pidHex/state", value, retain = true)
+            lastUpdateTime.value = reading.timestamp
+        }
         } finally {
             publishUnavailable()
             mqttPublisherRef?.disconnect()
