@@ -64,6 +64,18 @@ def test_summary_row_fuel_uses_change():
         assert c["stat_type"] == "change"
 
 
+def test_summary_row_battery_uses_change():
+    row = summary_row()
+    battery_col = row["cards"][2]
+    preset_cards = [
+        c["card"]
+        for c in battery_col["cards"]
+        if c.get("type") == "conditional" and c["conditions"][0]["state"] != "Personalizado"
+    ]
+    for c in preset_cards:
+        assert c["stat_type"] == "change"
+
+
 def test_apexcharts_card_structure():
     card = apexcharts_card("Bateria", BATTERY_ENTITY, "#4CAF50", "%")
     assert card["type"] == "custom:apexcharts-card"

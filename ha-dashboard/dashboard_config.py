@@ -94,9 +94,9 @@ def summary_stat_column(title: str, entity: str, stat_type: str) -> dict:
     preset_cards = [
         _conditional(
             label,
-            _statistic_card(title, entity, stat_type, calendar_period),
+            _statistic_card(title, entity, stat_type, PERIOD_TO_CALENDAR[label]),
         )
-        for label, calendar_period in PERIOD_TO_CALENDAR.items()
+        for label in ["Hoje", "7 dias", "30 dias"]  # explicit order, not dict iteration
     ]
     custom_card = _conditional(
         "Personalizado",
