@@ -16,7 +16,6 @@ data class AppConfig(
     val mqttPort: Int,
     val mqttUser: String,
     val mqttPassword: String,
-    val pollIntervalSeconds: Int,
     val deviceName: String,
     val deviceModel: String,
     val deviceManufacturer: String
@@ -32,7 +31,6 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
         val MQTT_PORT = intPreferencesKey("mqttPort")
         val MQTT_USER = stringPreferencesKey("mqttUser")
         val MQTT_PASSWORD = stringPreferencesKey("mqttPassword")
-        val POLL_INTERVAL_SECONDS = intPreferencesKey("pollIntervalSeconds")
         val DEVICE_NAME = stringPreferencesKey("deviceName")
         val DEVICE_MODEL = stringPreferencesKey("deviceModel")
         val DEVICE_MANUFACTURER = stringPreferencesKey("deviceManufacturer")
@@ -49,7 +47,6 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
     val mqttPort: Flow<Int> = dataStore.data.map { it[MQTT_PORT] ?: 1883 }
     val mqttUser: Flow<String> = dataStore.data.map { it[MQTT_USER] ?: "" }
     val mqttPassword: Flow<String> = dataStore.data.map { it[MQTT_PASSWORD] ?: "" }
-    val pollIntervalSeconds: Flow<Int> = dataStore.data.map { it[POLL_INTERVAL_SECONDS] ?: 5 }
     val deviceName: Flow<String> = dataStore.data.map { it[DEVICE_NAME] ?: "Jaecoo 7" }
     val deviceModel: Flow<String> = dataStore.data.map { it[DEVICE_MODEL] ?: "Jaecoo 7" }
     val deviceManufacturer: Flow<String> = dataStore.data.map { it[DEVICE_MANUFACTURER] ?: "Jaecoo" }
@@ -60,7 +57,6 @@ class AppSettings(private val dataStore: DataStore<Preferences>) {
         mqttPort = mqttPort.first(),
         mqttUser = mqttUser.first(),
         mqttPassword = mqttPassword.first(),
-        pollIntervalSeconds = pollIntervalSeconds.first(),
         deviceName = deviceName.first(),
         deviceModel = deviceModel.first(),
         deviceManufacturer = deviceManufacturer.first()

@@ -40,11 +40,11 @@ fun PidSelectionScreen(
     }
 
     fun toggle(pid: Int) {
-        selected = if (pid in selected) selected - pid else selected + pid
-        val current = selected
+        val next = if (pid in selected) selected - pid else selected + pid
+        selected = next
         scope.launch {
             val allDiscovered = settings.cachedPids.first()
-            settings.setSelectedPids(if (current == allDiscovered) null else current)
+            settings.setSelectedPids(if (next == allDiscovered) null else next)
         }
     }
 
@@ -58,12 +58,10 @@ fun PidSelectionScreen(
         scope.launch { settings.setSelectedPids(emptySet()) }
     }
 
-    val fastPids = cachedPids.intersect(PidPoller.FAST_PIDS).sortedBy {
-        PidRegistry.getOrUnknown(it).name
-    }
-    val slowPids = (cachedPids - PidPoller.FAST_PIDS).sortedBy {
-        PidRegistry.getOrUnknown(it).name
-    }
+    val sortedPids = cachedPids.sortedWith(
+        compareByDescending<Int> { PidRegistry.getOrUnknown(it).isFast }
+            .thenBy { PidRegistry.getOrUnknown(it).name }
+    )
 
     Scaffold(
         topBar = {
@@ -130,7 +128,7 @@ fun PidSelectionScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "Only selected PIDs are polled and sent to MQTT",
+                            text = "Fast: ${PidPoller.FAST_INTERVAL_SECONDS}s · Slow: ${PidPoller.SLOW_INTERVAL_SECONDS}s",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -151,61 +149,24 @@ fun PidSelectionScreen(
                 }
             }
 
-            // ── Fast PIDs ─────────────────────────────────────────────────────
-            if (fastPids.isNotEmpty()) {
-                Text(
-                    text = "Fast — every cycle",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-                )
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    elevation = CardDefaults.cardElevation(0.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    fastPids.forEachIndexed { index, pid ->
-                        if (index > 0) HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        PidRow(
-                            pid = pid,
-                            checked = pid in selected,
-                            onToggle = { toggle(pid) }
-                        )
-                    }
-                }
-            }
-
-            // ── Slow PIDs ─────────────────────────────────────────────────────
-            if (slowPids.isNotEmpty()) {
-                Text(
-                    text = "Slow — every ~6 cycles",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-                )
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    elevation = CardDefaults.cardElevation(0.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    slowPids.forEachIndexed { index, pid ->
-                        if (index > 0) HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                        PidRow(
-                            pid = pid,
-                            checked = pid in selected,
-                            onToggle = { toggle(pid) }
-                        )
-                    }
+            // ── PID list (sorted: fast first, then alphabetical) ──────────────
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                sortedPids.forEachIndexed { index, pid ->
+                    if (index > 0) HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                    PidRow(
+                        pid = pid,
+                        checked = pid in selected,
+                        onToggle = { toggle(pid) }
+                    )
                 }
             }
 
@@ -217,12 +178,14 @@ fun PidSelectionScreen(
 @Composable
 private fun PidRow(pid: Int, checked: Boolean, onToggle: () -> Unit) {
     val def = PidRegistry.getOrUnknown(pid)
+    val speed = if (def.isFast) "${PidPoller.FAST_INTERVAL_SECONDS}s" else "${PidPoller.SLOW_INTERVAL_SECONDS}s"
     ListItem(
         headlineContent = { Text(def.name, style = MaterialTheme.typography.bodyMedium) },
         supportingContent = {
             Text(
                 text = "0x${pid.toString(16).padStart(2, '0').uppercase()}" +
-                       if (def.unit.isNotBlank()) " · ${def.unit}" else "",
+                       (if (def.unit.isNotBlank()) " · ${def.unit}" else "") +
+                       " · $speed",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

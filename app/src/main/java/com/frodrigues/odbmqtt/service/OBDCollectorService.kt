@@ -19,6 +19,7 @@ import com.frodrigues.odbmqtt.obd.Mode22Registry
 import com.frodrigues.odbmqtt.obd.Mode22Scanner
 import com.frodrigues.odbmqtt.obd.ObdCommandExecutor
 import com.frodrigues.odbmqtt.obd.PidPoller
+import com.frodrigues.odbmqtt.obd.PidRegistry
 import com.frodrigues.odbmqtt.obd.PidScanner
 import com.frodrigues.odbmqtt.settings.AppSettings
 import com.frodrigues.odbmqtt.settings.dataStore
@@ -183,19 +184,14 @@ class OBDCollectorService : LifecycleService() {
         val userSelected: Set<Int>? = settings.selectedPids.first()
         val activePids: Set<Int> = if (userSelected == null) supportedPids else supportedPids.intersect(userSelected)
 
-        val fastPids = activePids.intersect(PidPoller.FAST_PIDS)
-        val slowPids = activePids - fastPids
+        val fastCount = activePids.count { PidRegistry.getOrUnknown(it).isFast }
+        val slowCount = activePids.size - fastCount
         status.value = ServiceStatus.CONNECTED
-        updateNotification("Connected — ${fastPids.size} fast + ${slowPids.size} slow PIDs")
+        updateNotification("Connected — $fastCount fast (${PidPoller.FAST_INTERVAL_SECONDS}s) + $slowCount slow (${PidPoller.SLOW_INTERVAL_SECONDS}s)")
 
         val currentReadings = mutableMapOf<Int, Double>()
 
-        PidPoller(
-            executor = executor,
-            fastPids = fastPids,
-            slowPids = slowPids,
-            intervalSeconds = config.pollIntervalSeconds
-        ).readings().collect { reading ->
+        PidPoller(executor = executor, pids = activePids).readings().collect { reading ->
             currentReadings[reading.pid] = reading.value
             pidReadings.value = currentReadings.toMap()
             val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()

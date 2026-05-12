@@ -40,9 +40,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    // Reactive state (non-text controls)
     val btMac by settings.btDeviceMac.collectAsState(initial = "")
-    val pollInterval by settings.pollIntervalSeconds.collectAsState(initial = 5)
 
     // Local text field state — avoids cursor-jump bug from DataStore re-emission
     var localHost by rememberSaveable { mutableStateOf("") }
@@ -314,7 +312,6 @@ fun SettingsScreen(
                                     mqttPort = localPort.toIntOrNull() ?: 1883,
                                     mqttUser = localUser,
                                     mqttPassword = localPassword,
-                                    pollIntervalSeconds = pollInterval,
                                     deviceName = localDeviceName,
                                     deviceModel = localDeviceModel,
                                     deviceManufacturer = localDeviceManufacturer
@@ -352,41 +349,6 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Polling ───────────────────────────────────────────────────────
-            SettingsSection(header = { SectionLabel("Polling") }) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Update interval",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    val pollOptions = listOf(1, 5, 10, 30, 60)
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        pollOptions.forEachIndexed { index, seconds ->
-                            SegmentedButton(
-                                selected = pollInterval == seconds,
-                                onClick = {
-                                    scope.launch {
-                                        settings.update {
-                                            this[AppSettings.POLL_INTERVAL_SECONDS] = seconds
-                                        }
-                                    }
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = pollOptions.size
-                                )
-                            ) {
-                                Text("${seconds}s")
                             }
                         }
                     }
