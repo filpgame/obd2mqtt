@@ -179,9 +179,19 @@ class OBDCollectorService : LifecycleService() {
         status.value = ServiceStatus.CONNECTED
         updateNotification("Connected — ${supportedPids.size} M01 + ${mode22Pids.size} M22 PIDs")
 
+        val fastPids = supportedPids.intersect(PidPoller.FAST_PIDS)
+        val slowPids = supportedPids - fastPids
+        status.value = ServiceStatus.CONNECTED
+        updateNotification("Connected — ${fastPids.size} fast + ${slowPids.size} slow PIDs")
+
         val currentReadings = mutableMapOf<Int, Double>()
 
-        PidPoller(executor, supportedPids, config.pollIntervalSeconds).readings().collect { reading ->
+        PidPoller(
+            executor = executor,
+            fastPids = fastPids,
+            slowPids = slowPids,
+            intervalSeconds = config.pollIntervalSeconds
+        ).readings().collect { reading ->
             currentReadings[reading.pid] = reading.value
             pidReadings.value = currentReadings.toMap()
             val pidHex = reading.pid.toString(16).padStart(2, '0').uppercase()
