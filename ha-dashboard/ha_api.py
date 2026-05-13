@@ -177,3 +177,46 @@ class HAWebSocketClient:
             }
         )
         print(f"  [saved] Dashboard config for '{url_path}'")
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    async def _state_exists(self, entity_id: str) -> bool:
+        """Check if an entity already exists via WebSocket get_states."""
+        states = await self.command({"type": "get_states"})
+        if isinstance(states, list):
+            return any(s.get("entity_id") == entity_id for s in states)
+        return False
+
+    async def create_input_datetime(self, name: str) -> None:
+        """Create a date-only input_datetime helper via WebSocket."""
+        slug = name.lower().replace(" ", "_")
+        entity_id = f"input_datetime.{slug}"
+        if await self._state_exists(entity_id):
+            print(f"  [skip] {entity_id} already exists")
+            return
+        await self.command({
+            "type": "input_datetime/create",
+            "name": name,
+            "has_date": True,
+            "has_time": False,
+            "icon": "mdi:calendar",
+        })
+        print(f"  [created] {entity_id}")
+
+    async def create_input_select(
+        self, name: str, options: list[str], initial: str
+    ) -> None:
+        """Create an input_select helper via WebSocket."""
+        slug = name.lower().replace(" ", "_")
+        entity_id = f"input_select.{slug}"
+        if await self._state_exists(entity_id):
+            print(f"  [skip] {entity_id} already exists")
+            return
+        await self.command({
+            "type": "input_select/create",
+            "name": name,
+            "options": options,
+            "initial": initial,
+            "icon": "mdi:calendar-range",
+        })
+        print(f"  [created] {entity_id}")

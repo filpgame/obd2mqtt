@@ -106,11 +106,11 @@ AUTOMATIONS = [
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def create_helpers(rest: HARESTClient) -> None:
+async def create_helpers(ws: HAWebSocketClient) -> None:
     print("\n[1/4] Creating helpers...")
-    rest.create_input_datetime("Jaecoo Chart Start")
-    rest.create_input_datetime("Jaecoo Chart End")
-    rest.create_input_select(
+    await ws.create_input_datetime("Jaecoo Chart Start")
+    await ws.create_input_datetime("Jaecoo Chart End")
+    await ws.create_input_select(
         "Jaecoo Period",
         options=["Hoje", "7 dias", "30 dias", "Personalizado"],
         initial="Hoje",
@@ -148,12 +148,11 @@ async def main(dry_run: bool = False) -> None:
         sys.exit(1)
     print("  [ok] HA is reachable")
 
-    create_helpers(rest)
-    create_automations(rest)
-
     ws = HAWebSocketClient(HA_HOST, HA_TOKEN)
     await ws.connect()
     try:
+        await create_helpers(ws)
+        create_automations(rest)
         await create_dashboard(ws, config)
     finally:
         await ws.close()
