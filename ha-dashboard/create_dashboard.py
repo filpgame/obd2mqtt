@@ -15,7 +15,7 @@ import sys
 from ha_api import HARESTClient, HAWebSocketClient
 from dashboard_config import build_dashboard_config
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 HA_HOST = "ha.mybarraco.duckdns.org"
 HA_TOKEN = (
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
@@ -23,11 +23,11 @@ HA_TOKEN = (
     ".9rlwlUV0m09PrPHPu2U-Og_02jNUAlUDufnieVAztfc"
 )
 
-# ── Automation definitions ─────────────────────────────────────────────────────
+# -- Automation definitions -----------------------------------------------------
 AUTOMATIONS = [
     {
         "id": "jaecoo_period_hoje",
-        "alias": "Jaecoo - Período Hoje",
+        "alias": "Jaecoo - Per-odo Hoje",
         "mode": "single",
         "trigger": [
             {
@@ -51,7 +51,7 @@ AUTOMATIONS = [
     },
     {
         "id": "jaecoo_period_7dias",
-        "alias": "Jaecoo - Período 7 dias",
+        "alias": "Jaecoo - Per-odo 7 dias",
         "mode": "single",
         "trigger": [
             {
@@ -77,7 +77,7 @@ AUTOMATIONS = [
     },
     {
         "id": "jaecoo_period_30dias",
-        "alias": "Jaecoo - Período 30 dias",
+        "alias": "Jaecoo - Per-odo 30 dias",
         "mode": "single",
         "trigger": [
             {
@@ -104,7 +104,7 @@ AUTOMATIONS = [
 ]
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 async def create_helpers(ws: HAWebSocketClient) -> None:
     print("\n[1/4] Creating helpers...")
@@ -125,18 +125,18 @@ def create_automations(rest: HARESTClient) -> None:
 
 async def create_dashboard(ws: HAWebSocketClient, config: dict) -> None:
     print("\n[3/4] Creating dashboard...")
-    await ws.create_dashboard("carros", "Carros", icon="mdi:car")
+    await ws.create_dashboard("jaecoo-carros", "Carros", icon="mdi:car")
     print("\n[4/4] Saving dashboard config...")
-    await ws.save_dashboard_config("carros", config)
+    await ws.save_dashboard_config("jaecoo-carros", config)
 
 
 async def main(dry_run: bool = False) -> None:
     config = build_dashboard_config()
 
     if dry_run:
-        print("=== DRY RUN — dashboard config ===")
+        print("=== DRY RUN - dashboard config ===")
         print(json.dumps(config, indent=2, ensure_ascii=False))
-        print("\n=== DRY RUN — automations ===")
+        print("\n=== DRY RUN - automations ===")
         print(json.dumps(AUTOMATIONS, indent=2, ensure_ascii=False))
         return
 
@@ -158,7 +158,7 @@ async def main(dry_run: bool = False) -> None:
         await ws.close()
 
     print(
-        f"\n✓ Done! Open https://{HA_HOST}/carros to see your dashboard."
+        f"\nDone! Open https://{HA_HOST}/jaecoo-carros to see your dashboard."
     )
 
 

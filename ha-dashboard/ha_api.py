@@ -173,8 +173,7 @@ class HAWebSocketClient:
                 "type": "lovelace/config/save",
                 "url_path": url_path,
                 "config": config,
-                "force": True,
-            }
+                }
         )
         print(f"  [saved] Dashboard config for '{url_path}'")
 
