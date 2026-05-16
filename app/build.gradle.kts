@@ -1,13 +1,15 @@
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // ── Versioning ────────────────────────────────────────────────────────────────
-// versionCode : GITHUB_RUN_NUMBER (auto-incrementing integer); local fallback = 1
-// versionName : tag build → "1.2.3" (v-prefix stripped)
-//               CI non-tag → "0.0.0-<sha7>"
-//               local      → "0.0.0-<gitSha7>"
 fun gitShortSha(): String = try {
     ProcessBuilder("git", "rev-parse", "--short", "HEAD")
         .redirectErrorStream(true)
@@ -15,13 +17,12 @@ fun gitShortSha(): String = try {
         .inputStream.bufferedReader().readLine()?.trim() ?: "unknown"
 } catch (_: Exception) { "unknown" }
 
-val ciRunNumber   = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
-val ciRefType     = System.getenv("GITHUB_REF_TYPE")          // "tag" | "branch" | null
-val ciRefName     = System.getenv("GITHUB_REF_NAME")          // "v1.2.3" | branch name | null
-val ciSha         = System.getenv("GITHUB_SHA")?.take(7)
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val ciRefType   = System.getenv("GITHUB_REF_TYPE")
+val ciRefName   = System.getenv("GITHUB_REF_NAME")
+val ciSha       = System.getenv("GITHUB_SHA")?.take(7)
 
 val appVersionCode = ciRunNumber ?: 1
-
 val appVersionName = when {
     ciRefType == "tag" && ciRefName != null -> ciRefName.removePrefix("v")
     ciRunNumber != null                     -> "0.0.0-${ciSha ?: gitShortSha()}"
@@ -29,13 +30,71 @@ val appVersionName = when {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-android {
-    namespace = "com.frodrigues.odbmqtt"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
+kotlin {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
+    androidTarget {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
         }
     }
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+    }
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+            implementation(compose.components.uiToolingPreview)
+
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.coroutines)
+            implementation(libs.jetbrains.navigation.compose)
+            implementation(libs.jetbrains.lifecycle.viewmodel.compose)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.lifecycle.runtime.ktx)
+            implementation(libs.androidx.lifecycle.service)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.datastore.preferences)
+            implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.hivemq.mqtt.client)
+        }
+    }
+}
+
+android {
+    namespace = "com.frodrigues.odbmqtt"
+    compileSdk = 36
+
+    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    sourceSets["main"].res.srcDirs("src/androidMain/res")
 
     defaultConfig {
         applicationId = "com.frodrigues.odbmqtt"
@@ -43,7 +102,6 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -56,13 +114,12 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    buildFeatures {
-        compose = true
-    }
+
     packaging {
         resources {
             excludes += setOf(
@@ -71,30 +128,8 @@ android {
             )
         }
     }
-}
 
-dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.service)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.hivemq.mqtt.client)
-    implementation(libs.kotlinx.coroutines.android)
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }

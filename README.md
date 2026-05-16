@@ -1,6 +1,8 @@
-# OBD Scanner MQTT
+# OBD Scanner MQTT — KMP edition
 
-Android app that reads OBD2 data from a vehicle via an ELM327 Bluetooth adapter and publishes sensor readings to Home Assistant using MQTT Discovery.
+Kotlin Multiplatform app (Android + iOS) that reads OBD2 data from a vehicle via an ELM327 Bluetooth adapter and publishes sensor readings to Home Assistant using MQTT Discovery. UI built with **Compose Multiplatform**.
+
+> **iOS status:** the project structure, common code, and Compose UI are KMP-ready and compile for `iosArm64`/`iosSimulatorArm64`. CoreBluetooth and the iOS MQTT client are stubbed — see [MIGRATION.md](MIGRATION.md) for the remaining work.
 
 ## Features
 
@@ -78,18 +80,26 @@ ELM327 ──BT──► BluetoothTransport (Classic/BLE)
 
 ## Tech Stack
 
-- Kotlin + Jetpack Compose
-- HiveMQ MQTT Client 1.3.3
-- AndroidX DataStore (settings persistence)
-- AndroidX Lifecycle / LifecycleService
-- Navigation Compose
+- Kotlin Multiplatform 2.3 + Compose Multiplatform 1.11
+- AGP 9.0 (Android target) / Kotlin/Native (iOS targets)
+- HiveMQ MQTT client 1.3 (Android) — iOS MQTT pending
+- multiplatform-settings 1.2 — SharedPreferences (Android) / NSUserDefaults (iOS)
+- kotlinx-datetime, kotlinx-serialization-json, kotlinx-coroutines
+- Compose Multiplatform Navigation 2.9
 
 ## Building
 
 ```bash
-./gradlew assembleDebug    # debug APK
-./gradlew assembleRelease  # release APK (requires signing config)
+# Android
+./gradlew :app:assembleDebug                       # debug APK
+./gradlew :app:testDebugUnitTest                   # JVM unit tests
+
+# iOS (compiles on macOS only)
+./gradlew :app:compileKotlinIosSimulatorArm64
+./gradlew :app:linkDebugFrameworkIosSimulatorArm64 # ComposeApp.framework for the simulator
 ```
+
+To run on iPhone, open `iosApp/iosApp.xcodeproj` after one-time setup (see [iosApp/README.md](iosApp/README.md)).
 
 ## License
 
