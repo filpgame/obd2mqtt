@@ -62,15 +62,28 @@ When the app stops or disconnects, all state topics receive an empty payload, ma
 ## Architecture
 
 ```mermaid
-flowchart TD
-    ELM327 -->|Bluetooth SPP / BLE| BT[BluetoothTransport]
-    BT --> OBD[ObdCommandExecutor\nAT init]
-    OBD --> SCAN[PidScanner\nbitmask scan]
-    OBD --> POLL[PidPoller\nround-robin loop]
-    SCAN --> SVC[OBDCollectorService\nForegroundService]
-    POLL --> SVC
-    SVC --> MQTT[MqttPublisher]
-    MQTT -->|MQTT Discovery| HA[Home Assistant]
+sequenceDiagram
+    participant ELM327
+    participant Device as Device (Android App)
+    participant Broker as MQTT Broker
+
+    Device->>ELM327: ATZ, ATE0, ATL0, ATH1, ATSP6, ATAT1
+    ELM327-->>Device: OK / ELM327 vX.X
+
+    Device->>ELM327: Scan PIDs (0100, 0120, ...)
+    ELM327-->>Device: Support bitmasks
+
+    Device->>Broker: Connect
+    Device->>Broker: Publish HA Discovery configs (retained)
+
+    loop Every poll cycle
+        Device->>ELM327: 01XX (fast PIDs every 1s, slow every 30s)
+        ELM327-->>Device: Response bytes
+        Device->>Broker: Publish sensor value (retained)
+    end
+
+    Device->>Broker: Publish empty payload (sensors → unavailable)
+    Device->>ELM327: Disconnect
 ```
 
 ## Tech Stack
