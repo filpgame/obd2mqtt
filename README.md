@@ -57,7 +57,7 @@ When the app stops or disconnects, all state topics receive an empty payload, ma
 | 0x5E | Fuel Rate | L/h |
 | 0x62 | Actual Torque | % |
 | 0xA6 | Odometer | km |
-| ... | [39 PIDs total](app/src/main/java/com/frodrigues/odbmqtt/obd/PidRegistry.kt) | |
+| ... | [39 PIDs total](app/src/main/java/com/frodrigues/obdmqtt/obd/PidRegistry.kt) | |
 
 ## Architecture
 

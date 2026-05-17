@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Android app (Kotlin + Jetpack Compose) that reads OBD2 data from a vehicle via an ELM327 Bluetooth adapter and publishes sensor readings to Home Assistant via MQTT Discovery. Also includes a Python helper (`ha-dashboard/`) for creating HA dashboards.
 
-- **Package**: `com.frodrigues.odbmqtt`
+- **Package**: `com.frodrigues.obdmqtt`
 - **minSdk**: 33 (Android 13+)
 - **Protocol confirmed working on**: Jaecoo 7 / OMODA platform (ISO 15765-4 CAN, 11-bit, 500 kbaud)
 
@@ -16,7 +16,7 @@ Android app (Kotlin + Jetpack Compose) that reads OBD2 data from a vehicle via a
 ./gradlew assembleDebug       # debug APK
 ./gradlew assembleRelease     # release APK (requires signing config in CI)
 ./gradlew test                # run unit tests
-./gradlew :app:testDebugUnitTest --tests "com.frodrigues.odbmqtt.obd.PidScannerTest"  # single test class
+./gradlew :app:testDebugUnitTest --tests "com.frodrigues.obdmqtt.obd.PidScannerTest"  # single test class
 ```
 
 **Versioning**: `versionCode` = `GITHUB_RUN_NUMBER` (local fallback = 1). `versionName` = git tag (e.g. `v1.2.3` → `1.2.3`) on tag builds, `0.0.0-<sha7>` otherwise. Releases are created automatically on `v*` tag pushes via `.github/workflows/`.
