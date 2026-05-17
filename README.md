@@ -61,19 +61,16 @@ When the app stops or disconnects, all state topics receive an empty payload, ma
 
 ## Architecture
 
-```
-ELM327 ──BT──► BluetoothTransport (Classic/BLE)
-                      │
-                      ▼
-              ObdCommandExecutor (AT init)
-                      │
-               PidScanner (bitmask scan)
-               PidPoller  (round-robin loop)
-                      │
-                      ▼
-             MqttPublisher ──► Home Assistant
-                      ▲
-              OBDCollectorService (ForegroundService)
+```mermaid
+flowchart TD
+    ELM327 -->|Bluetooth SPP / BLE| BT[BluetoothTransport]
+    BT --> OBD[ObdCommandExecutor\nAT init]
+    OBD --> SCAN[PidScanner\nbitmask scan]
+    OBD --> POLL[PidPoller\nround-robin loop]
+    SCAN --> SVC[OBDCollectorService\nForegroundService]
+    POLL --> SVC
+    SVC --> MQTT[MqttPublisher]
+    MQTT -->|MQTT Discovery| HA[Home Assistant]
 ```
 
 ## Tech Stack
