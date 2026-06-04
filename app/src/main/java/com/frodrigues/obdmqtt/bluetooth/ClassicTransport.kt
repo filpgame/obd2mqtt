@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -23,13 +24,20 @@ class ClassicTransport(private val device: BluetoothDevice) : BluetoothTransport
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
 
-    override suspend fun connect() = withContext(Dispatchers.IO) {
-        val s = device.createRfcommSocketToServiceRecord(SPP_UUID)
-        s.connect()
-        socket = s
-        inputStream = s.inputStream
-        outputStream = s.outputStream
-        _isConnected.value = true
+    override suspend fun connect() = withTimeout(15_000) {
+        withContext(Dispatchers.IO) {
+            val s = device.createRfcommSocketToServiceRecord(SPP_UUID)
+            try {
+                runInterruptible { s.connect() }
+            } catch (e: Exception) {
+                runCatching { s.close() }
+                throw e
+            }
+            socket = s
+            inputStream = s.inputStream
+            outputStream = s.outputStream
+            _isConnected.value = true
+        }
     }
 
     override suspend fun disconnect() = withContext(Dispatchers.IO) {
@@ -40,13 +48,19 @@ class ClassicTransport(private val device: BluetoothDevice) : BluetoothTransport
         outputStream = null
     }
 
-    override suspend fun sendCommand(command: String): String = withTimeout(5_000) {
-        withContext(Dispatchers.IO) {
-            val out = outputStream ?: throw IOException("Not connected")
-            val inp = inputStream ?: throw IOException("Not connected")
-            out.write("$command\r".toByteArray(Charsets.UTF_8))
-            out.flush()
-            readUntilPrompt(inp)
+    override suspend fun sendCommand(command: String): String {
+        try {
+            return withTimeout(5_000) {
+                withContext(Dispatchers.IO) {
+                    val out = outputStream ?: throw IOException("Not connected")
+                    val inp = inputStream ?: throw IOException("Not connected")
+                    out.write("$command\r".toByteArray(Charsets.UTF_8))
+                    out.flush()
+                    readUntilPrompt(inp)
+                }
+            }
+        } catch (e: TimeoutCancellationException) {
+            throw IOException("Command timed out: $command")
         }
     }
 

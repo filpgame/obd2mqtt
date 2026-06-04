@@ -79,8 +79,11 @@ class OBDCollectorService : LifecycleService() {
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OBDCollector::polling")
             .also { it.acquire() }
-        collectorJob?.cancel()
-        collectorJob = lifecycleScope.launch(Dispatchers.Default) { collectWithRetry() }
+        val oldJob = collectorJob
+        collectorJob = lifecycleScope.launch(Dispatchers.Default) {
+            oldJob?.cancelAndJoin()
+            collectWithRetry()
+        }
     }
 
     private suspend fun collectWithRetry() {
@@ -91,18 +94,7 @@ class OBDCollectorService : LifecycleService() {
                 collect()
                 attempt = 0
             } catch (e: CancellationException) {
-                if (e is TimeoutCancellationException) {
-                    // sendCommand socket stalled — recoverable, reconnect with backoff
-                    status.value = ServiceStatus.RECONNECTING
-                    btStatus.value = ConnectionStatus.DISCONNECTED
-                    mqttStatus.value = ConnectionStatus.DISCONNECTED
-                    val delay = backoffMs.getOrElse(attempt) { 60_000L }
-                    attempt = minOf(attempt + 1, backoffMs.lastIndex)
-                    updateNotification("Reconnecting in ${delay / 1000}s...")
-                    delay(delay)
-                } else {
-                    throw e  // actual job cancellation — stop the loop
-                }
+                throw e  // job cancelled externally — stop
             } catch (e: Exception) {
                 status.value = ServiceStatus.RECONNECTING
                 btStatus.value = ConnectionStatus.DISCONNECTED
@@ -212,10 +204,12 @@ class OBDCollectorService : LifecycleService() {
             lastUpdateTime.value = reading.timestamp
         }
         } finally {
-            publishUnavailable()
-            mqttPublisherRef?.disconnect()
-            mqttPublisherRef = null
-            transport.disconnect()
+            withContext(NonCancellable) {
+                publishUnavailable()
+                mqttPublisherRef?.disconnect()
+                mqttPublisherRef = null
+                transport.disconnect()
+            }
             btStatus.value = ConnectionStatus.DISCONNECTED
             mqttStatus.value = ConnectionStatus.DISCONNECTED
             pidReadings.value = emptyMap()
